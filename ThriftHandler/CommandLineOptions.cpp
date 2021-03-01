@@ -712,6 +712,11 @@ void CommandLineOptions::fillAdvancedOptions() {
                                    ->implicit_value(true),
                                "Invalidate join hash table caches after each SQL query. "
                                "Used for performance measurements.");
+  developer_desc.add_options()("enable-cpu-shmem",
+                               po::value<bool>(&g_enable_cpu_shmem)
+                                   ->default_value(g_enable_cpu_shmem)
+                                   ->implicit_value(true),
+                               "Enable shared memory in ResultSets for CPU code.");
 }
 
 namespace {

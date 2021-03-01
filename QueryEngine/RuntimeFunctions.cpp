@@ -374,6 +374,10 @@ extern "C" ALWAYS_INLINE int64_t agg_sum(int64_t* agg, const int64_t val) {
   return old;
 }
 
+extern "C" ALWAYS_INLINE int64_t agg_sum_cpu_shared(int64_t* agg, const int64_t val) {
+  return __atomic_fetch_add(agg, val, __ATOMIC_ACQ_REL);
+}
+
 extern "C" ALWAYS_INLINE void agg_max(int64_t* agg, const int64_t val) {
   *agg = std::max(*agg, val);
 }
@@ -383,6 +387,10 @@ extern "C" ALWAYS_INLINE void agg_min(int64_t* agg, const int64_t val) {
 }
 
 extern "C" ALWAYS_INLINE void agg_id(int64_t* agg, const int64_t val) {
+  *agg = val;
+}
+
+extern "C" ALWAYS_INLINE void agg_id_cpu_shared(int64_t* agg, const int64_t val) {
   *agg = val;
 }
 

@@ -27,6 +27,7 @@
 
 bool g_enable_smem_group_by{true};
 extern bool g_enable_columnar_output;
+extern bool g_enable_cpu_shmem;
 
 namespace {
 
@@ -429,6 +430,16 @@ QueryMemoryDescriptor::QueryMemoryDescriptor(
   col_slot_context_.validate();
 
   sort_on_gpu_ = sort_on_gpu_hint && canOutputColumnar() && !keyless_hash_;
+
+#ifdef DBG_PRINT
+  std::cout << "QueryMemoryDescriptor::QueryMemoryDescriptor" << std::endl
+            << "  keyless_hash_: " << keyless_hash_ << std::endl
+            << "  entry_count_: " << entry_count_ << std::endl;
+  std::cout << "group_col_widths:";
+  for (auto& s : group_col_widths)
+    std::cout << " " << s;
+  std::cout << std::endl;
+#endif
 
   if (sort_on_gpu_) {
     CHECK(!ra_exe_unit.use_bump_allocator);
@@ -1017,6 +1028,11 @@ bool QueryMemoryDescriptor::usesGetGroupValueFast() const {
 
 bool QueryMemoryDescriptor::threadsShareMemory() const {
   return query_desc_type_ != QueryDescriptionType::NonGroupedAggregate;
+}
+
+bool QueryMemoryDescriptor::cpuThreadsShareMemory() const {
+  return g_enable_cpu_shmem &&
+         query_desc_type_ == QueryDescriptionType::GroupByPerfectHash && keyless_hash_;
 }
 
 bool QueryMemoryDescriptor::blocksShareMemory() const {

@@ -202,3 +202,4 @@ extern size_t g_subfragment_size;
 extern bool g_enable_filter_function;
 extern size_t g_max_import_threads;
 extern bool g_cleanup_join_hash_table_cache;
+extern bool g_enable_cpu_shmem;

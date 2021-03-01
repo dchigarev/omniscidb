@@ -51,6 +51,8 @@ class SharedKernelContext {
   threadpool::ThreadPool<void>* thread_pool;
   tbb::enumerable_thread_specific<std::unique_ptr<QueryExecutionContext>>
       tls_execution_context;
+  std::unique_ptr<QueryExecutionContext> shared_execution_context;
+  std::mutex shared_execution_context_mutex;
 #endif  // HAVE_TBB
 
  private:

@@ -295,6 +295,8 @@ class QueryMemoryDescriptor {
   bool blocksShareMemory() const;
   bool threadsShareMemory() const;
 
+  bool cpuThreadsShareMemory() const;
+
   bool lazyInitGroups(const ExecutorDeviceType) const;
 
   bool interleavedBins(const ExecutorDeviceType) const;
@@ -305,8 +307,7 @@ class QueryMemoryDescriptor {
                               const size_t bin,
                               const size_t col_idx) const;
 
-  size_t getNextColOffInBytesRowOnly(const int8_t* col_ptr,
-                              const size_t col_idx) const;
+  size_t getNextColOffInBytesRowOnly(const int8_t* col_ptr, const size_t col_idx) const;
   size_t getColOnlyOffInBytes(const size_t col_idx) const;
   size_t getRowSize() const;
   size_t getColsSize() const;
