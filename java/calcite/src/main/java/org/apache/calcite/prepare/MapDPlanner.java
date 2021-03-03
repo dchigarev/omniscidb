@@ -222,9 +222,18 @@ public class MapDPlanner extends PlannerImpl {
     applyQueryOptimizationRules(relR);
     applyFilterPushdown(relR);
 
-    final RelNode root = relR.project();
+    HepProgramBuilder programBuilder = new HepProgramBuilder();
+    programBuilder.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE_INCLUDE_OUTER);
+    programBuilder.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
+    programBuilder.addRuleInstance(CoreRules.PROJECT_REMOVE);
+    programBuilder.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+    programBuilder.addRuleInstance(ProjectProjectRemoveRule.INSTANCE);
+    programBuilder.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE);
 
-    return RelRoot.of(root, relR.kind);
+    HepPlanner hepPlanner = new HepPlanner(programBuilder.build());
+    final RelNode root = relR.project();
+    hepPlanner.setRoot(root);
+    return RelRoot.of(hepPlanner.findBestExp(), relR.kind);
   }
 
   public void setFilterPushDownInfo(final List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo) {
