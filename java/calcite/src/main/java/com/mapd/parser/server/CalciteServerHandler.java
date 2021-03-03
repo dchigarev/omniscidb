@@ -88,11 +88,8 @@ public class CalciteServerHandler implements CalciteServer.Iface {
 
   // TODO MAT we need to merge this into common code base for these functions with
   // CalciteDirect since we are not deprecating this stuff yet
-  public CalciteServerHandler(int mapdPort,
-          String dataDir,
-          String extensionFunctionsAstFile,
-          SockTransportProperties skT,
-          String udfAstFile) {
+  public CalciteServerHandler(int mapdPort, String dataDir, String extensionFunctionsAstFile,
+      SockTransportProperties skT, String udfAstFile) {
     this.mapdPort = mapdPort;
     this.dataDir = dataDir;
 
@@ -101,8 +98,7 @@ public class CalciteServerHandler implements CalciteServer.Iface {
     try {
       extSigs = ExtensionFunctionSignatureParser.parse(extensionFunctionsAstFile);
     } catch (IOException ex) {
-      MAPDLOGGER.error(
-              "Could not load extension function signatures: " + ex.getMessage(), ex);
+      MAPDLOGGER.error("Could not load extension function signatures: " + ex.getMessage(), ex);
     }
     extSigsJson = ExtensionFunctionSignatureParser.signaturesToJson(extSigs);
 
@@ -133,15 +129,9 @@ public class CalciteServerHandler implements CalciteServer.Iface {
   }
 
   @Override
-  public TPlanResult process(String user,
-          String session,
-          String catalog,
-          String queryText,
-          java.util.List<TFilterPushDownInfo> thriftFilterPushDownInfo,
-          boolean legacySyntax,
-          boolean isExplain,
-          boolean isViewOptimize,
-          TRestriction restriction) throws InvalidParseRequest, TException {
+  public TPlanResult process(String user, String session, String catalog, String queryText,
+      java.util.List<TFilterPushDownInfo> thriftFilterPushDownInfo, boolean legacySyntax, boolean isExplain,
+      boolean isViewOptimize, TRestriction restriction) throws InvalidParseRequest, TException {
     long timer = System.currentTimeMillis();
     callCount++;
 
@@ -159,8 +149,7 @@ public class CalciteServerHandler implements CalciteServer.Iface {
       rest = new Restriction(restriction.column, restriction.values);
     }
     MapDUser mapDUser = new MapDUser(user, session, catalog, mapdPort, rest);
-    MAPDLOGGER.debug("process was called User: " + user + " Catalog: " + catalog
-            + " sql: " + queryText);
+    MAPDLOGGER.debug("process was called User: " + user + " Catalog: " + catalog + " sql: " + queryText);
     parser.setUser(mapDUser);
     CURRENT_PARSER.set(parser);
 
@@ -182,18 +171,18 @@ public class CalciteServerHandler implements CalciteServer.Iface {
     TAccessedQueryObjects primaryAccessedObjects = new TAccessedQueryObjects();
     TAccessedQueryObjects resolvedAccessedObjects = new TAccessedQueryObjects();
     try {
+      final List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo = new ArrayList<>();
+      for (final TFilterPushDownInfo req : thriftFilterPushDownInfo) {
+        filterPushDownInfo
+            .add(new MapDParserOptions.FilterPushDownInfo(req.input_prev, req.input_start, req.input_next));
+      }
+      MapDParserOptions parserOptions = new MapDParserOptions(filterPushDownInfo, legacySyntax, isExplain,
+          isViewOptimize);
+
       if (!isRAQuery) {
-        final List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo =
-                new ArrayList<>();
-        for (final TFilterPushDownInfo req : thriftFilterPushDownInfo) {
-          filterPushDownInfo.add(new MapDParserOptions.FilterPushDownInfo(
-                  req.input_prev, req.input_start, req.input_next));
-        }
         Pair<String, SqlIdentifierCapturer> res;
         SqlNode node;
         try {
-          MapDParserOptions parserOptions = new MapDParserOptions(
-                  filterPushDownInfo, legacySyntax, isExplain, isViewOptimize);
           res = parser.process(queryText, parserOptions);
           jsonResult = res.left;
           capturer = res.right;
@@ -206,10 +195,8 @@ public class CalciteServerHandler implements CalciteServer.Iface {
           // also resolve all the views in the select part
           // resolution of the other parts is not
           // necessary as these cannot be views
-          resolvedAccessedObjects.tables_selected_from =
-                  new ArrayList<>(parser.resolveSelectIdentifiers(capturer));
-          resolvedAccessedObjects.tables_inserted_into =
-                  new ArrayList<>(capturer.inserts);
+          resolvedAccessedObjects.tables_selected_from = new ArrayList<>(parser.resolveSelectIdentifiers(capturer));
+          resolvedAccessedObjects.tables_inserted_into = new ArrayList<>(capturer.inserts);
           resolvedAccessedObjects.tables_updated_in = new ArrayList<>(capturer.updates);
           resolvedAccessedObjects.tables_deleted_from = new ArrayList<>(capturer.deletes);
         } catch (ValidationException ex) {
@@ -222,7 +209,7 @@ public class CalciteServerHandler implements CalciteServer.Iface {
           throw ex;
         }
       } else {
-        jsonResult = parser.optimizeRAQuery(queryText);
+        jsonResult = parser.optimizeRAQuery(queryText, parserOptions);
       }
     } catch (SqlParseException ex) {
       String msg = "Parse failed: " + ex.getMessage();
@@ -313,12 +300,8 @@ public class CalciteServerHandler implements CalciteServer.Iface {
   }
 
   @Override
-  public List<TCompletionHint> getCompletionHints(String user,
-          String session,
-          String catalog,
-          List<String> visible_tables,
-          String sql,
-          int cursor) throws TException {
+  public List<TCompletionHint> getCompletionHints(String user, String session, String catalog,
+      List<String> visible_tables, String sql, int cursor) throws TException {
     callCount++;
     MapDParser parser;
     try {
@@ -329,8 +312,7 @@ public class CalciteServerHandler implements CalciteServer.Iface {
       throw new TException(msg);
     }
     MapDUser mapDUser = new MapDUser(user, session, catalog, mapdPort, null);
-    MAPDLOGGER.debug("getCompletionHints was called User: " + user
-            + " Catalog: " + catalog + " sql: " + sql);
+    MAPDLOGGER.debug("getCompletionHints was called User: " + user + " Catalog: " + catalog + " sql: " + sql);
     parser.setUser(mapDUser);
     CURRENT_PARSER.set(parser);
 
@@ -354,21 +336,20 @@ public class CalciteServerHandler implements CalciteServer.Iface {
     }
     List<TCompletionHint> result = new ArrayList<>();
     for (final SqlMoniker hint : completion_result.hints) {
-      result.add(new TCompletionHint(hintTypeToThrift(hint.getType()),
-              hint.getFullyQualifiedNames(),
-              completion_result.replaced));
+      result.add(new TCompletionHint(hintTypeToThrift(hint.getType()), hint.getFullyQualifiedNames(),
+          completion_result.replaced));
     }
     return result;
   }
 
   @Override
-  public void setRuntimeExtensionFunctions(List<TUserDefinedFunction> udfs,
-          List<TUserDefinedTableFunction> udtfs,
-          boolean isruntime) {
+  public void setRuntimeExtensionFunctions(List<TUserDefinedFunction> udfs, List<TUserDefinedTableFunction> udtfs,
+      boolean isruntime) {
     if (isruntime) {
       // Clean up previously defined Runtime UDFs
       if (udfRTSigs != null) {
-        for (String name : udfRTSigs.keySet()) extSigs.remove(name);
+        for (String name : udfRTSigs.keySet())
+          extSigs.remove(name);
         udfRTSigsJson = "";
         udfRTSigs.clear();
       } else {
@@ -386,8 +367,8 @@ public class CalciteServerHandler implements CalciteServer.Iface {
       // Avoid overwritting compiled and Loadtime UDFs:
       for (String name : udfRTSigs.keySet()) {
         if (extSigs.containsKey(name)) {
-          MAPDLOGGER.error("Extension function `" + name
-                  + "` exists. Skipping runtime extenension function with the same name.");
+          MAPDLOGGER.error(
+              "Extension function `" + name + "` exists. Skipping runtime extenension function with the same name.");
           udfRTSigs.remove(name);
         }
       }
@@ -412,8 +393,7 @@ public class CalciteServerHandler implements CalciteServer.Iface {
   }
 
   private static ExtensionFunction toExtensionFunction(TUserDefinedFunction udf) {
-    List<ExtensionFunction.ExtArgumentType> args =
-            new ArrayList<ExtensionFunction.ExtArgumentType>();
+    List<ExtensionFunction.ExtArgumentType> args = new ArrayList<ExtensionFunction.ExtArgumentType>();
     for (TExtArgumentType atype : udf.argTypes) {
       final ExtensionFunction.ExtArgumentType arg_type = toExtArgumentType(atype);
       if (arg_type != ExtensionFunction.ExtArgumentType.Void) {
@@ -424,21 +404,18 @@ public class CalciteServerHandler implements CalciteServer.Iface {
   }
 
   private static ExtensionFunction toExtensionFunction(TUserDefinedTableFunction udtf) {
-    List<ExtensionFunction.ExtArgumentType> args =
-            new ArrayList<ExtensionFunction.ExtArgumentType>();
+    List<ExtensionFunction.ExtArgumentType> args = new ArrayList<ExtensionFunction.ExtArgumentType>();
     for (TExtArgumentType atype : udtf.sqlArgTypes) {
       args.add(toExtArgumentType(atype));
     }
-    List<ExtensionFunction.ExtArgumentType> outs =
-            new ArrayList<ExtensionFunction.ExtArgumentType>();
+    List<ExtensionFunction.ExtArgumentType> outs = new ArrayList<ExtensionFunction.ExtArgumentType>();
     for (TExtArgumentType otype : udtf.outputArgTypes) {
       outs.add(toExtArgumentType(otype));
     }
     return new ExtensionFunction(args, outs);
   }
 
-  private static ExtensionFunction.ExtArgumentType toExtArgumentType(
-          TExtArgumentType type) {
+  private static ExtensionFunction.ExtArgumentType toExtArgumentType(TExtArgumentType type) {
     switch (type) {
       case Int8:
         return ExtensionFunction.ExtArgumentType.Int8;

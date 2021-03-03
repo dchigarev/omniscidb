@@ -18,6 +18,7 @@ package com.mapd.calcite.parser;
 import static org.apache.calcite.sql.parser.SqlParserPos.ZERO;
 
 import com.google.common.collect.ImmutableList;
+import com.mapd.calcite.parser.MapDParserOptions.FilterPushDownInfo;
 import com.mapd.common.SockTransportProperties;
 import com.mapd.parser.extension.ddl.ExtendedSqlParser;
 import com.mapd.parser.extension.ddl.JsonSerializableDdl;
@@ -140,14 +141,12 @@ import java.util.function.Supplier;
  */
 public final class MapDParser {
   public static final ThreadLocal<MapDParser> CURRENT_PARSER = new ThreadLocal<>();
-  private static final EnumSet<SqlKind> SCALAR =
-          EnumSet.of(SqlKind.SCALAR_QUERY, SqlKind.SELECT);
+  private static final EnumSet<SqlKind> SCALAR = EnumSet.of(SqlKind.SCALAR_QUERY, SqlKind.SELECT);
   private static final EnumSet<SqlKind> EXISTS = EnumSet.of(SqlKind.EXISTS);
   private static final EnumSet<SqlKind> DELETE = EnumSet.of(SqlKind.DELETE);
   private static final EnumSet<SqlKind> UPDATE = EnumSet.of(SqlKind.UPDATE);
   private static final EnumSet<SqlKind> IN = EnumSet.of(SqlKind.IN);
-  private static final EnumSet<SqlKind> ARRAY_VALUE =
-          EnumSet.of(SqlKind.ARRAY_VALUE_CONSTRUCTOR);
+  private static final EnumSet<SqlKind> ARRAY_VALUE = EnumSet.of(SqlKind.ARRAY_VALUE_CONSTRUCTOR);
 
   final static Logger MAPDLOGGER = LoggerFactory.getLogger(MapDParser.class);
 
@@ -162,10 +161,8 @@ public final class MapDParser {
 
   private static Map<String, Boolean> SubqueryCorrMemo = new ConcurrentHashMap<>();
 
-  public MapDParser(String dataDir,
-          final Supplier<MapDSqlOperatorTable> mapDSqlOperatorTable,
-          int mapdPort,
-          SockTransportProperties skT) {
+  public MapDParser(String dataDir, final Supplier<MapDSqlOperatorTable> mapDSqlOperatorTable, int mapdPort,
+      SockTransportProperties skT) {
     this.dataDir = dataDir;
     this.mapDSqlOperatorTable = mapDSqlOperatorTable;
     this.mapdPort = mapdPort;
@@ -180,15 +177,12 @@ public final class MapDParser {
     MapDTypeSystem myTypeSystem = new MapDTypeSystem();
     CalciteConnectionConfig config = new CalciteConnectionConfigImpl(new Properties()) {
       {
-        properties.put(CalciteConnectionProperty.CASE_SENSITIVE.camelName(),
-                String.valueOf(false));
-        properties.put(CalciteConnectionProperty.CONFORMANCE.camelName(),
-                String.valueOf(SqlConformanceEnum.LENIENT));
+        properties.put(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), String.valueOf(false));
+        properties.put(CalciteConnectionProperty.CONFORMANCE.camelName(), String.valueOf(SqlConformanceEnum.LENIENT));
       }
 
       @SuppressWarnings("unchecked")
-      public <T extends Object> T typeSystem(
-              java.lang.Class<T> typeSystemClass, T defaultTypeSystem) {
+      public <T extends Object> T typeSystem(java.lang.Class<T> typeSystemClass, T defaultTypeSystem) {
         return (T) myTypeSystem;
       };
 
@@ -222,8 +216,7 @@ public final class MapDParser {
     }
 
     try {
-      MapDParser parser = new MapDParser(
-              dataDir, mapDSqlOperatorTable, mapdPort, sock_transport_properties);
+      MapDParser parser = new MapDParser(dataDir, mapDSqlOperatorTable, mapdPort, sock_transport_properties);
       MapDParserOptions options = new MapDParserOptions();
       parser.setUser(mapdUser);
       parser.processSql(expression, options);
@@ -236,10 +229,8 @@ public final class MapDParser {
     return false;
   }
 
-  private MapDPlanner getPlanner(final boolean allowSubQueryExpansion,
-          final boolean allowPushdownJoinCondition) {
-    final MapDSchema mapd =
-            new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
+  private MapDPlanner getPlanner(final boolean allowSubQueryExpansion, final boolean allowPushdownJoinCondition) {
+    final MapDSchema mapd = new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
     final SchemaPlus rootSchema = Frameworks.createRootSchema(true);
 
     BiPredicate<SqlNode, SqlNode> expandPredicate = new BiPredicate<SqlNode, SqlNode>() {
@@ -303,10 +294,8 @@ public final class MapDParser {
 
             if (null != select) {
               if (null != select.getFetch() || null != select.getOffset()
-                      || (null != select.getOrderList()
-                              && select.getOrderList().size() != 0)) {
-                throw new CalciteException(
-                        "Correlated sub-queries with ordering not supported.", null);
+                  || (null != select.getOrderList() && select.getOrderList().size() != 0)) {
+                throw new CalciteException("Correlated sub-queries with ordering not supported.", null);
               }
             }
             return true;
@@ -340,32 +329,19 @@ public final class MapDParser {
       }
     };
 
-    final FrameworkConfig config =
-            Frameworks.newConfigBuilder()
-                    .defaultSchema(rootSchema.add(mapdUser.getDB(), mapd))
-                    .operatorTable(mapDSqlOperatorTable.get())
-                    .parserConfig(SqlParser.configBuilder()
-                                          .setConformance(SqlConformanceEnum.LENIENT)
-                                          .setUnquotedCasing(Casing.UNCHANGED)
-                                          .setCaseSensitive(false)
-                                          // allow identifiers of up to 512 chars
-                                          .setIdentifierMaxLength(512)
-                                          .setParserFactory(ExtendedSqlParser.FACTORY)
-                                          .build())
-                    .sqlToRelConverterConfig(
-                            SqlToRelConverter
-                                    .configBuilder()
-                                    // enable sub-query expansion (de-correlation)
-                                    .withExpandPredicate(expandPredicate)
-                                    // allow as many as possible IN operator values
-                                    .withInSubQueryThreshold(Integer.MAX_VALUE)
-                                    .withPushdownJoinCondition(pushdownJoinPredicate)
-                                    .withHintStrategyTable(
-                                            OmniSciHintStrategyTable.HINT_STRATEGY_TABLE)
-                                    .build())
-                    .typeSystem(createTypeSystem())
-                    .context(MAPD_CONNECTION_CONTEXT)
-                    .build();
+    final FrameworkConfig config = Frameworks.newConfigBuilder().defaultSchema(rootSchema.add(mapdUser.getDB(), mapd))
+        .operatorTable(mapDSqlOperatorTable.get())
+        .parserConfig(SqlParser.configBuilder().setConformance(SqlConformanceEnum.LENIENT)
+            .setUnquotedCasing(Casing.UNCHANGED).setCaseSensitive(false)
+            // allow identifiers of up to 512 chars
+            .setIdentifierMaxLength(512).setParserFactory(ExtendedSqlParser.FACTORY).build())
+        .sqlToRelConverterConfig(SqlToRelConverter.configBuilder()
+            // enable sub-query expansion (de-correlation)
+            .withExpandPredicate(expandPredicate)
+            // allow as many as possible IN operator values
+            .withInSubQueryThreshold(Integer.MAX_VALUE).withPushdownJoinCondition(pushdownJoinPredicate)
+            .withHintStrategyTable(OmniSciHintStrategyTable.HINT_STRATEGY_TABLE).build())
+        .typeSystem(createTypeSystem()).context(MAPD_CONNECTION_CONTEXT).build();
     MapDPlanner planner = new MapDPlanner(config);
     planner.setRestriction(mapdUser.getRestriction());
     return planner;
@@ -375,9 +351,8 @@ public final class MapDParser {
     this.mapdUser = mapdUser;
   }
 
-  public Pair<String, SqlIdentifierCapturer> process(
-          String sql, final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
+  public Pair<String, SqlIdentifierCapturer> process(String sql, final MapDParserOptions parserOptions)
+      throws SqlParseException, ValidationException, RelConversionException {
     final MapDPlanner planner = getPlanner(true, true);
     final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
     String res = processSql(sqlNode, parserOptions);
@@ -385,17 +360,18 @@ public final class MapDParser {
     return new Pair<String, SqlIdentifierCapturer>(res, capture);
   }
 
-  public String optimizeRAQuery(String query) throws IOException {
-    MapDSchema schema =
-            new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
+  public String optimizeRAQuery(String query, final MapDParserOptions parserOptions) throws IOException {
+    MapDSchema schema = new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
     MapDPlanner planner = getPlanner(true, true);
+
+    planner.setFilterPushDownInfo(parserOptions.getFilterPushDownInfo());
     RelRoot optRel = planner.optimizeRaQuery(query, schema);
     optRel = replaceIsTrue(planner.getTypeFactory(), optRel);
     return MapDSerializer.toString(optRel.project());
   }
 
   public String processSql(String sql, final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
+      throws SqlParseException, ValidationException, RelConversionException {
     callCount++;
 
     final MapDPlanner planner = getPlanner(true, true);
@@ -405,7 +381,7 @@ public final class MapDParser {
   }
 
   public String processSql(final SqlNode sqlNode, final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
+      throws SqlParseException, ValidationException, RelConversionException {
     callCount++;
 
     if (sqlNode instanceof JsonSerializableDdl) {
@@ -431,14 +407,12 @@ public final class MapDParser {
     return res;
   }
 
-  public MapDPlanner.CompletionResult getCompletionHints(
-          String sql, int cursor, List<String> visible_tables) {
+  public MapDPlanner.CompletionResult getCompletionHints(String sql, int cursor, List<String> visible_tables) {
     return getPlanner().getCompletionHints(sql, cursor, visible_tables);
   }
 
   public Set<String> resolveSelectIdentifiers(SqlIdentifierCapturer capturer) {
-    MapDSchema schema =
-            new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
+    MapDSchema schema = new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
     HashSet<String> resolved = new HashSet<>();
 
     for (String name : capturer.selects) {
@@ -483,9 +457,8 @@ public final class MapDParser {
     final SqlSelect inner = (SqlSelect) update.getSourceExpressionList().get(0);
 
     if (null != inner.getGroup() || null != inner.getFetch() || null != inner.getOffset()
-            || (null != inner.getOrderList() && inner.getOrderList().size() != 0)
-            || (null != inner.getGroup() && inner.getGroup().size() != 0)
-            || null == getTableName(inner.getFrom())) {
+        || (null != inner.getOrderList() && inner.getOrderList().size() != 0)
+        || (null != inner.getGroup() && inner.getGroup().size() != 0) || null == getTableName(inner.getFrom())) {
       return null;
     }
 
@@ -500,8 +473,7 @@ public final class MapDParser {
         @Override
         public SqlNode visit(SqlIdentifier id) {
           if (id.isSimple()) {
-            id = new SqlIdentifier(Arrays.asList(updateTableName, id.getSimple()),
-                    id.getParserPosition());
+            id = new SqlIdentifier(Arrays.asList(updateTableName, id.getSimple()), id.getParserPosition());
           }
 
           return id;
@@ -509,13 +481,9 @@ public final class MapDParser {
       });
     }
 
-    SqlJoin join = new SqlJoin(ZERO,
-            update.getTargetTable(),
-            SqlLiteral.createBoolean(false, ZERO),
-            SqlLiteral.createSymbol(JoinType.LEFT, ZERO),
-            inner.getFrom(),
-            SqlLiteral.createSymbol(JoinConditionType.ON, ZERO),
-            inner.getWhere());
+    SqlJoin join = new SqlJoin(ZERO, update.getTargetTable(), SqlLiteral.createBoolean(false, ZERO),
+        SqlLiteral.createSymbol(JoinType.LEFT, ZERO), inner.getFrom(),
+        SqlLiteral.createSymbol(JoinConditionType.ON, ZERO), inner.getWhere());
 
     SqlNode select0 = inner.getSelectList().get(0);
 
@@ -528,46 +496,27 @@ public final class MapDParser {
     }
 
     if (wrapInSingleValue) {
-      select0 = new SqlBasicCall(
-              SqlStdOperatorTable.SINGLE_VALUE, new SqlNode[] {select0}, ZERO);
+      select0 = new SqlBasicCall(SqlStdOperatorTable.SINGLE_VALUE, new SqlNode[] { select0 }, ZERO);
     }
 
     SqlNodeList selectList = new SqlNodeList(ZERO);
     selectList.add(select0);
     selectList.add(new SqlBasicCall(SqlStdOperatorTable.AS,
-            new SqlNode[] {new SqlBasicCall(
-                                   new SqlUnresolvedFunction(
-                                           new SqlIdentifier("OFFSET_IN_FRAGMENT", ZERO),
-                                           null,
-                                           null,
-                                           null,
-                                           null,
-                                           SqlFunctionCategory.USER_DEFINED_FUNCTION),
-                                   new SqlNode[0],
-                                   SqlParserPos.ZERO),
-                    new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO)},
-            ZERO));
+        new SqlNode[] {
+            new SqlBasicCall(new SqlUnresolvedFunction(new SqlIdentifier("OFFSET_IN_FRAGMENT", ZERO), null, null, null,
+                null, SqlFunctionCategory.USER_DEFINED_FUNCTION), new SqlNode[0], SqlParserPos.ZERO),
+            new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO) },
+        ZERO));
 
     SqlNodeList groupBy = new SqlNodeList(ZERO);
     groupBy.add(new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO));
 
-    SqlSelect select = new SqlSelect(ZERO,
-            null,
-            selectList,
-            join,
-            where,
-            groupBy,
-            null,
-            null,
-            null,
-            null,
-            null,
-            null);
+    SqlSelect select = new SqlSelect(ZERO, null, selectList, join, where, groupBy, null, null, null, null, null, null);
     return select;
   }
 
   private LogicalTableModify getDummyUpdate(SqlUpdate update)
-          throws SqlParseException, ValidationException, RelConversionException {
+      throws SqlParseException, ValidationException, RelConversionException {
     SqlIdentifier targetTable = (SqlIdentifier) update.getTargetTable();
     String targetTableName = targetTable.names.get(targetTable.names.size() - 1);
     MapDPlanner planner = getPlanner();
@@ -580,15 +529,14 @@ public final class MapDParser {
   }
 
   private RelRoot rewriteUpdateAsSelect(SqlUpdate update, MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
+      throws SqlParseException, ValidationException, RelConversionException {
     int correlatedQueriesCount[] = new int[1];
     SqlBasicVisitor<Void> correlatedQueriesCounter = new SqlBasicVisitor<Void>() {
       @Override
       public Void visit(SqlCall call) {
         if (call.isA(SCALAR)
-                && ((call instanceof SqlBasicCall && call.operandCount() == 1
-                            && !call.operand(0).isA(SCALAR))
-                        || !(call instanceof SqlBasicCall))) {
+            && ((call instanceof SqlBasicCall && call.operandCount() == 1 && !call.operand(0).isA(SCALAR))
+                || !(call instanceof SqlBasicCall))) {
           if (isCorrelated(call)) {
             correlatedQueriesCount[0]++;
           }
@@ -599,9 +547,7 @@ public final class MapDParser {
 
     update.accept(correlatedQueriesCounter);
     if (correlatedQueriesCount[0] > 1) {
-      throw new CalciteException(
-              "table modifications with multiple correlated sub-queries not supported.",
-              null);
+      throw new CalciteException("table modifications with multiple correlated sub-queries not supported.", null);
     }
 
     boolean allowPushdownJoinCondition = false;
@@ -622,69 +568,42 @@ public final class MapDParser {
           throw new RuntimeException("Unknown identifier type!");
         }
         SqlIdentifier id = (SqlIdentifier) targetColumn;
-        RelDataType fieldType =
-                targetTableType.getField(id.names.get(id.names.size() - 1), false, false)
-                        .getType();
+        RelDataType fieldType = targetTableType.getField(id.names.get(id.names.size() - 1), false, false).getType();
 
         if (expression.isA(ARRAY_VALUE) && null != fieldType.getComponentType()) {
           // apply a cast to all array value elements
 
           SqlDataTypeSpec elementType = new SqlDataTypeSpec(
-                  new SqlBasicTypeNameSpec(fieldType.getComponentType().getSqlTypeName(),
-                          fieldType.getPrecision(),
-                          fieldType.getScale(),
-                          null == fieldType.getCharset() ? null
-                                                         : fieldType.getCharset().name(),
-                          SqlParserPos.ZERO),
-                  SqlParserPos.ZERO);
+              new SqlBasicTypeNameSpec(fieldType.getComponentType().getSqlTypeName(), fieldType.getPrecision(),
+                  fieldType.getScale(), null == fieldType.getCharset() ? null : fieldType.getCharset().name(),
+                  SqlParserPos.ZERO),
+              SqlParserPos.ZERO);
           SqlCall array_expression = (SqlCall) expression;
           ArrayList<SqlNode> values = new ArrayList<>();
 
           for (SqlNode value : array_expression.getOperandList()) {
             if (value.isA(EnumSet.of(SqlKind.LITERAL))) {
-              SqlNode casted_value = new SqlBasicCall(SqlStdOperatorTable.CAST,
-                      new SqlNode[] {value, elementType},
-                      value.getParserPosition());
+              SqlNode casted_value = new SqlBasicCall(SqlStdOperatorTable.CAST, new SqlNode[] { value, elementType },
+                  value.getParserPosition());
               values.add(casted_value);
             } else {
               values.add(value);
             }
           }
 
-          expression = new SqlBasicCall(MapDSqlOperatorTable.ARRAY_VALUE_CONSTRUCTOR,
-                  values.toArray(new SqlNode[0]),
-                  expression.getParserPosition());
+          expression = new SqlBasicCall(MapDSqlOperatorTable.ARRAY_VALUE_CONSTRUCTOR, values.toArray(new SqlNode[0]),
+              expression.getParserPosition());
         }
         sourceExpression.add(expression);
       }
 
-      sourceExpression.add(new SqlBasicCall(SqlStdOperatorTable.AS,
-              new SqlNode[] {
-                      new SqlBasicCall(new SqlUnresolvedFunction(
-                                               new SqlIdentifier("OFFSET_IN_FRAGMENT",
-                                                       SqlParserPos.ZERO),
-                                               null,
-                                               null,
-                                               null,
-                                               null,
-                                               SqlFunctionCategory.USER_DEFINED_FUNCTION),
-                              new SqlNode[0],
-                              SqlParserPos.ZERO),
-                      new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO)},
-              ZERO));
+      sourceExpression.add(new SqlBasicCall(SqlStdOperatorTable.AS, new SqlNode[] {
+          new SqlBasicCall(new SqlUnresolvedFunction(new SqlIdentifier("OFFSET_IN_FRAGMENT", SqlParserPos.ZERO), null,
+              null, null, null, SqlFunctionCategory.USER_DEFINED_FUNCTION), new SqlNode[0], SqlParserPos.ZERO),
+          new SqlIdentifier("EXPR$DELETE_OFFSET_IN_FRAGMENT", ZERO) }, ZERO));
 
-      select = new SqlSelect(SqlParserPos.ZERO,
-              null,
-              sourceExpression,
-              update.getTargetTable(),
-              update.getCondition(),
-              null,
-              null,
-              null,
-              null,
-              null,
-              null,
-              null);
+      select = new SqlSelect(SqlParserPos.ZERO, null, sourceExpression, update.getTargetTable(), update.getCondition(),
+          null, null, null, null, null, null, null);
     }
 
     MapDPlanner planner = getPlanner(true, allowPushdownJoinCondition);
@@ -712,8 +631,7 @@ public final class MapDParser {
     int idx = 0;
     for (RexNode exp : project.getProjects()) {
       if (applyRexCast && idx + 1 < project.getProjects().size()) {
-        RelDataType expectedFieldType =
-                targetTableType.getField(fields.get(idx), false, false).getType();
+        RelDataType expectedFieldType = targetTableType.getField(fields.get(idx), false, false).getType();
         if (!exp.getType().equals(expectedFieldType) && !exp.isA(ARRAY_VALUE)) {
           exp = builder.makeCast(expectedFieldType, exp);
         }
@@ -726,38 +644,29 @@ public final class MapDParser {
     ArrayList<RexNode> inputs = new ArrayList<RexNode>();
     int n = 0;
     for (int i = 0; i < fields.size(); i++) {
-      inputs.add(
-              new RexInputRef(n, project.getRowType().getFieldList().get(n).getType()));
+      inputs.add(new RexInputRef(n, project.getRowType().getFieldList().get(n).getType()));
       n++;
     }
 
     fields.add("EXPR$DELETE_OFFSET_IN_FRAGMENT");
     inputs.add(new RexInputRef(n, project.getRowType().getFieldList().get(n).getType()));
 
-    project = project.copy(
-            project.getTraitSet(), project.getInput(), nodes, project.getRowType());
+    project = project.copy(project.getTraitSet(), project.getInput(), nodes, project.getRowType());
 
-    LogicalTableModify modify = LogicalTableModify.create(targetTable,
-            dummyModify.getCatalogReader(),
-            project,
-            Operation.UPDATE,
-            fields,
-            inputs,
-            true);
+    LogicalTableModify modify = LogicalTableModify.create(targetTable, dummyModify.getCatalogReader(), project,
+        Operation.UPDATE, fields, inputs, true);
     return RelRoot.of(modify, SqlKind.UPDATE);
   }
 
   RelRoot queryToRelNode(final String sql, final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
+      throws SqlParseException, ValidationException, RelConversionException {
     final MapDPlanner planner = getPlanner(true, true);
     final SqlNode sqlNode = parseSql(sql, parserOptions.isLegacySyntax(), planner);
     return convertSqlToRelNode(sqlNode, planner, parserOptions);
   }
 
-  RelRoot convertSqlToRelNode(final SqlNode sqlNode,
-          final MapDPlanner mapDPlanner,
-          final MapDParserOptions parserOptions)
-          throws SqlParseException, ValidationException, RelConversionException {
+  RelRoot convertSqlToRelNode(final SqlNode sqlNode, final MapDPlanner mapDPlanner,
+      final MapDParserOptions parserOptions) throws SqlParseException, ValidationException, RelConversionException {
     SqlNode node = sqlNode;
     MapDPlanner planner = mapDPlanner;
     boolean allowCorrelatedSubQueryExpansion = true;
@@ -766,13 +675,8 @@ public final class MapDParser {
 
     if (node.isA(DELETE)) {
       SqlDelete sqlDelete = (SqlDelete) node;
-      node = new SqlUpdate(node.getParserPosition(),
-              sqlDelete.getTargetTable(),
-              SqlNodeList.EMPTY,
-              SqlNodeList.EMPTY,
-              sqlDelete.getCondition(),
-              sqlDelete.getSourceSelect(),
-              sqlDelete.getAlias());
+      node = new SqlUpdate(node.getParserPosition(), sqlDelete.getTargetTable(), SqlNodeList.EMPTY, SqlNodeList.EMPTY,
+          sqlDelete.getCondition(), sqlDelete.getSourceSelect(), sqlDelete.getAlias());
 
       patchUpdateToDelete = true;
     }
@@ -804,8 +708,7 @@ public final class MapDParser {
       planner.close();
       // create a new one
       planner = getPlanner(allowCorrelatedSubQueryExpansion, allowPushdownJoinCondition);
-      node = parseSql(
-              node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
+      node = parseSql(node.toSqlString(CalciteSqlDialect.DEFAULT).toString(), false, planner);
     }
 
     SqlNode validateR = planner.validate(node);
@@ -819,8 +722,7 @@ public final class MapDParser {
     } else {
       // check to see if a view is involved in the query
       boolean foundView = false;
-      MapDSchema schema = new MapDSchema(
-              dataDir, this, mapdPort, mapdUser, sock_transport_properties);
+      MapDSchema schema = new MapDSchema(dataDir, this, mapdPort, mapdUser, sock_transport_properties);
       SqlIdentifierCapturer capturer = captureIdentifiers(sqlNode);
       for (String name : capturer.selects) {
         MapDTable table = (MapDTable) schema.getTable(name);
@@ -860,24 +762,18 @@ public final class MapDParser {
         call = (RexCall) super.visitCall(call);
         if (call.getKind() == SqlKind.IS_TRUE) {
           return builder.makeCall(SqlStdOperatorTable.AND,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
-                  call.getOperands().get(0));
+              builder.makeCall(SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)), call.getOperands().get(0));
         } else if (call.getKind() == SqlKind.IS_NOT_TRUE) {
           return builder.makeCall(SqlStdOperatorTable.OR,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
-                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
+              builder.makeCall(SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
+              builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
         } else if (call.getKind() == SqlKind.IS_FALSE) {
           return builder.makeCall(SqlStdOperatorTable.AND,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
-                  builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
+              builder.makeCall(SqlStdOperatorTable.IS_NOT_NULL, call.getOperands().get(0)),
+              builder.makeCall(SqlStdOperatorTable.NOT, call.getOperands().get(0)));
         } else if (call.getKind() == SqlKind.IS_NOT_FALSE) {
           return builder.makeCall(SqlStdOperatorTable.OR,
-                  builder.makeCall(
-                          SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)),
-                  call.getOperands().get(0));
+              builder.makeCall(SqlStdOperatorTable.IS_NULL, call.getOperands().get(0)), call.getOperands().get(0));
         }
 
         return call;
@@ -892,16 +788,10 @@ public final class MapDParser {
       }
     });
 
-    return new RelRoot(node,
-            root.validatedRowType,
-            root.kind,
-            root.fields,
-            root.collation,
-            Collections.emptyList());
+    return new RelRoot(node, root.validatedRowType, root.kind, root.fields, root.collation, Collections.emptyList());
   }
 
-  private SqlNode parseSql(String sql, final boolean legacy_syntax, Planner planner)
-          throws SqlParseException {
+  private SqlNode parseSql(String sql, final boolean legacy_syntax, Planner planner) throws SqlParseException {
     SqlNode parseR = null;
     try {
       parseR = planner.parse(sql);
@@ -950,10 +840,8 @@ public final class MapDParser {
   }
 
   private SqlNode expandCase(SqlCase old_case_node, RelDataTypeFactory typeFactory) {
-    SqlNodeList newWhenList =
-            new SqlNodeList(old_case_node.getWhenOperands().getParserPosition());
-    SqlNodeList newThenList =
-            new SqlNodeList(old_case_node.getThenOperands().getParserPosition());
+    SqlNodeList newWhenList = new SqlNodeList(old_case_node.getWhenOperands().getParserPosition());
+    SqlNodeList newThenList = new SqlNodeList(old_case_node.getThenOperands().getParserPosition());
     java.util.Map<String, SqlNode> id_to_expr = new java.util.HashMap<String, SqlNode>();
     for (SqlNode node : old_case_node.getWhenOperands()) {
       SqlNode newCall = expand(node, id_to_expr, typeFactory);
@@ -973,31 +861,24 @@ public final class MapDParser {
     }
     SqlNode new_else_operand = old_case_node.getElseOperand();
     if (null != new_else_operand) {
-      SqlNode candidate_else_operand =
-              expand(old_case_node.getElseOperand(), id_to_expr, typeFactory);
+      SqlNode candidate_else_operand = expand(old_case_node.getElseOperand(), id_to_expr, typeFactory);
       if (null != candidate_else_operand) {
         new_else_operand = candidate_else_operand;
       }
     }
     SqlNode new_value_operand = old_case_node.getValueOperand();
     if (null != new_value_operand) {
-      SqlNode candidate_value_operand =
-              expand(old_case_node.getValueOperand(), id_to_expr, typeFactory);
+      SqlNode candidate_value_operand = expand(old_case_node.getValueOperand(), id_to_expr, typeFactory);
       if (null != candidate_value_operand) {
         new_value_operand = candidate_value_operand;
       }
     }
-    SqlNode newCaseNode = SqlCase.createSwitched(old_case_node.getParserPosition(),
-            new_value_operand,
-            newWhenList,
-            newThenList,
-            new_else_operand);
+    SqlNode newCaseNode = SqlCase.createSwitched(old_case_node.getParserPosition(), new_value_operand, newWhenList,
+        newThenList, new_else_operand);
     return newCaseNode;
   }
 
-  private SqlOrderBy desugar(SqlSelect select_node,
-          SqlOrderBy order_by_node,
-          RelDataTypeFactory typeFactory) {
+  private SqlOrderBy desugar(SqlSelect select_node, SqlOrderBy order_by_node, RelDataTypeFactory typeFactory) {
     MAPDLOGGER.debug("desugar: before: " + select_node.toString());
     desugarExpression(select_node.getFrom(), typeFactory);
     desugarExpression(select_node.getWhere(), typeFactory);
@@ -1035,15 +916,10 @@ public final class MapDParser {
       expand(having, id_to_expr, typeFactory);
     }
     SqlOrderBy new_order_by_node = null;
-    if (order_by_node != null && order_by_node.orderList != null
-            && order_by_node.orderList.size() > 0) {
-      SqlNodeList new_order_by_list =
-              expand(order_by_node.orderList, id_to_expr, typeFactory);
-      new_order_by_node = new SqlOrderBy(order_by_node.getParserPosition(),
-              select_node,
-              new_order_by_list,
-              order_by_node.offset,
-              order_by_node.fetch);
+    if (order_by_node != null && order_by_node.orderList != null && order_by_node.orderList.size() > 0) {
+      SqlNodeList new_order_by_list = expand(order_by_node.orderList, id_to_expr, typeFactory);
+      new_order_by_node = new SqlOrderBy(order_by_node.getParserPosition(), select_node, new_order_by_list,
+          order_by_node.offset, order_by_node.fetch);
     }
 
     MAPDLOGGER.debug("desugar:  after: " + select_node.toString());
@@ -1068,9 +944,8 @@ public final class MapDParser {
     }
   }
 
-  private SqlNode expand(final SqlNode node,
-          final java.util.Map<String, SqlNode> id_to_expr,
-          RelDataTypeFactory typeFactory) {
+  private SqlNode expand(final SqlNode node, final java.util.Map<String, SqlNode> id_to_expr,
+      RelDataTypeFactory typeFactory) {
     MAPDLOGGER.debug("expand: " + node.toString());
     if (node instanceof SqlBasicCall) {
       SqlBasicCall node_call = (SqlBasicCall) node;
@@ -1098,9 +973,8 @@ public final class MapDParser {
     return node;
   }
 
-  private SqlNodeList expand(final SqlNodeList group_by_list,
-          final java.util.Map<String, SqlNode> id_to_expr,
-          RelDataTypeFactory typeFactory) {
+  private SqlNodeList expand(final SqlNodeList group_by_list, final java.util.Map<String, SqlNode> id_to_expr,
+      RelDataTypeFactory typeFactory) {
     SqlNodeList new_group_by_list = new SqlNodeList(new SqlParserPos(-1, -1));
     for (SqlNode group_by : group_by_list) {
       if (!(group_by instanceof SqlIdentifier)) {
@@ -1117,8 +991,7 @@ public final class MapDParser {
     return new_group_by_list;
   }
 
-  private SqlNode expandVariance(
-          final SqlBasicCall proj_call, RelDataTypeFactory typeFactory) {
+  private SqlNode expandVariance(final SqlBasicCall proj_call, RelDataTypeFactory typeFactory) {
     // Expand variance aggregates that are not supported natively
     if (proj_call.operandCount() != 1) {
       return null;
@@ -1135,12 +1008,12 @@ public final class MapDParser {
       sqrt = true;
       flt = true;
     } else if (proj_call.getOperator().isName("STDDEV_SAMP", false)
-            || proj_call.getOperator().getName().equalsIgnoreCase("STDDEV")) {
+        || proj_call.getOperator().getName().equalsIgnoreCase("STDDEV")) {
       biased = false;
       sqrt = true;
       flt = false;
     } else if (proj_call.getOperator().getName().equalsIgnoreCase("STDDEV_SAMP_FLOAT")
-            || proj_call.getOperator().getName().equalsIgnoreCase("STDDEV_FLOAT")) {
+        || proj_call.getOperator().getName().equalsIgnoreCase("STDDEV_FLOAT")) {
       biased = false;
       sqrt = true;
       flt = true;
@@ -1153,12 +1026,12 @@ public final class MapDParser {
       sqrt = false;
       flt = true;
     } else if (proj_call.getOperator().isName("VAR_SAMP", false)
-            || proj_call.getOperator().getName().equalsIgnoreCase("VARIANCE")) {
+        || proj_call.getOperator().getName().equalsIgnoreCase("VARIANCE")) {
       biased = false;
       sqrt = false;
       flt = false;
     } else if (proj_call.getOperator().getName().equalsIgnoreCase("VAR_SAMP_FLOAT")
-            || proj_call.getOperator().getName().equalsIgnoreCase("VARIANCE_FLOAT")) {
+        || proj_call.getOperator().getName().equalsIgnoreCase("VARIANCE_FLOAT")) {
       biased = false;
       sqrt = false;
       flt = true;
@@ -1167,19 +1040,14 @@ public final class MapDParser {
     }
     final SqlNode operand = proj_call.operand(0);
     final SqlParserPos pos = proj_call.getParserPosition();
-    SqlNode expanded_proj_call =
-            expandVariance(pos, operand, biased, sqrt, flt, typeFactory);
+    SqlNode expanded_proj_call = expandVariance(pos, operand, biased, sqrt, flt, typeFactory);
     MAPDLOGGER.debug("Expanded select_list SqlCall: " + proj_call.toString());
     MAPDLOGGER.debug("to : " + expanded_proj_call.toString());
     return expanded_proj_call;
   }
 
-  private SqlNode expandVariance(final SqlParserPos pos,
-          final SqlNode operand,
-          boolean biased,
-          boolean sqrt,
-          boolean flt,
-          RelDataTypeFactory typeFactory) {
+  private SqlNode expandVariance(final SqlParserPos pos, final SqlNode operand, boolean biased, boolean sqrt,
+      boolean flt, RelDataTypeFactory typeFactory) {
     // stddev_pop(x) ==>
     // power(
     // (sum(x * x) - sum(x) * sum(x) / (case count(x) when 0 then NULL else count(x)
@@ -1200,10 +1068,8 @@ public final class MapDParser {
     // count(x)
     // end))) / ((case count(x) when 1 then NULL else count(x) - 1 end))
     //
-    final SqlNode arg = SqlStdOperatorTable.CAST.createCall(pos,
-            operand,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    final SqlNode arg = SqlStdOperatorTable.CAST.createCall(pos, operand,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
     final SqlNode argSquared = SqlStdOperatorTable.MULTIPLY.createCall(pos, arg, arg);
     final SqlNode sumArgSquared = SqlStdOperatorTable.SUM.createCall(pos, argSquared);
     final SqlNode sum = SqlStdOperatorTable.SUM.createCall(pos, arg);
@@ -1216,16 +1082,11 @@ public final class MapDParser {
     SqlNodeList thenList = new SqlNodeList(pos);
     whenList.add(countEqZero);
     thenList.add(nul);
-    final SqlNode int_denominator = SqlStdOperatorTable.CASE.createCall(
-            null, pos, null, whenList, thenList, count);
-    final SqlNode denominator = SqlStdOperatorTable.CAST.createCall(pos,
-            int_denominator,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
-    final SqlNode avgSumSquared =
-            SqlStdOperatorTable.DIVIDE.createCall(pos, sumSquared, denominator);
-    final SqlNode diff =
-            SqlStdOperatorTable.MINUS.createCall(pos, sumArgSquared, avgSumSquared);
+    final SqlNode int_denominator = SqlStdOperatorTable.CASE.createCall(null, pos, null, whenList, thenList, count);
+    final SqlNode denominator = SqlStdOperatorTable.CAST.createCall(pos, int_denominator,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    final SqlNode avgSumSquared = SqlStdOperatorTable.DIVIDE.createCall(pos, sumSquared, denominator);
+    final SqlNode diff = SqlStdOperatorTable.MINUS.createCall(pos, sumArgSquared, avgSumSquared);
     final SqlNode denominator1;
     if (biased) {
       denominator1 = denominator;
@@ -1237,12 +1098,10 @@ public final class MapDParser {
       SqlNodeList thenList1 = new SqlNodeList(pos);
       whenList1.add(countEqOne);
       thenList1.add(nul);
-      final SqlNode int_denominator1 = SqlStdOperatorTable.CASE.createCall(
-              null, pos, null, whenList1, thenList1, countMinusOne);
-      denominator1 = SqlStdOperatorTable.CAST.createCall(pos,
-              int_denominator1,
-              SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                      flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+      final SqlNode int_denominator1 = SqlStdOperatorTable.CASE.createCall(null, pos, null, whenList1, thenList1,
+          countMinusOne);
+      denominator1 = SqlStdOperatorTable.CAST.createCall(pos, int_denominator1,
+          SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
     }
     final SqlNode div = SqlStdOperatorTable.DIVIDE.createCall(pos, diff, denominator1);
     SqlNode result = div;
@@ -1250,14 +1109,11 @@ public final class MapDParser {
       final SqlNumericLiteral half = SqlLiteral.createExactNumeric("0.5", pos);
       result = SqlStdOperatorTable.POWER.createCall(pos, div, half);
     }
-    return SqlStdOperatorTable.CAST.createCall(pos,
-            result,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    return SqlStdOperatorTable.CAST.createCall(pos, result,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
   }
 
-  private SqlNode expandCovariance(
-          final SqlBasicCall proj_call, RelDataTypeFactory typeFactory) {
+  private SqlNode expandCovariance(final SqlBasicCall proj_call, RelDataTypeFactory typeFactory) {
     // Expand covariance aggregates
     if (proj_call.operandCount() != 2) {
       return null;
@@ -1282,48 +1138,34 @@ public final class MapDParser {
     final SqlNode operand0 = proj_call.operand(0);
     final SqlNode operand1 = proj_call.operand(1);
     final SqlParserPos pos = proj_call.getParserPosition();
-    SqlNode expanded_proj_call =
-            expandCovariance(pos, operand0, operand1, pop, flt, typeFactory);
+    SqlNode expanded_proj_call = expandCovariance(pos, operand0, operand1, pop, flt, typeFactory);
     MAPDLOGGER.debug("Expanded select_list SqlCall: " + proj_call.toString());
     MAPDLOGGER.debug("to : " + expanded_proj_call.toString());
     return expanded_proj_call;
   }
 
-  private SqlNode expandCovariance(SqlParserPos pos,
-          final SqlNode operand0,
-          final SqlNode operand1,
-          boolean pop,
-          boolean flt,
-          RelDataTypeFactory typeFactory) {
+  private SqlNode expandCovariance(SqlParserPos pos, final SqlNode operand0, final SqlNode operand1, boolean pop,
+      boolean flt, RelDataTypeFactory typeFactory) {
     // covar_pop(x, y) ==> avg(x * y) - avg(x) * avg(y)
     // covar_samp(x, y) ==> (sum(x * y) - sum(x) * avg(y))
     // ((case count(x) when 1 then NULL else count(x) - 1 end))
-    final SqlNode arg0 = SqlStdOperatorTable.CAST.createCall(operand0.getParserPosition(),
-            operand0,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
-    final SqlNode arg1 = SqlStdOperatorTable.CAST.createCall(operand1.getParserPosition(),
-            operand1,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    final SqlNode arg0 = SqlStdOperatorTable.CAST.createCall(operand0.getParserPosition(), operand0,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    final SqlNode arg1 = SqlStdOperatorTable.CAST.createCall(operand1.getParserPosition(), operand1,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
     final SqlNode mulArg = SqlStdOperatorTable.MULTIPLY.createCall(pos, arg0, arg1);
     final SqlNode avgArg1 = SqlStdOperatorTable.AVG.createCall(pos, arg1);
     if (pop) {
       final SqlNode avgMulArg = SqlStdOperatorTable.AVG.createCall(pos, mulArg);
       final SqlNode avgArg0 = SqlStdOperatorTable.AVG.createCall(pos, arg0);
-      final SqlNode mulAvgAvg =
-              SqlStdOperatorTable.MULTIPLY.createCall(pos, avgArg0, avgArg1);
-      final SqlNode covarPop =
-              SqlStdOperatorTable.MINUS.createCall(pos, avgMulArg, mulAvgAvg);
-      return SqlStdOperatorTable.CAST.createCall(pos,
-              covarPop,
-              SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                      flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+      final SqlNode mulAvgAvg = SqlStdOperatorTable.MULTIPLY.createCall(pos, avgArg0, avgArg1);
+      final SqlNode covarPop = SqlStdOperatorTable.MINUS.createCall(pos, avgMulArg, mulAvgAvg);
+      return SqlStdOperatorTable.CAST.createCall(pos, covarPop,
+          SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
     }
     final SqlNode sumMulArg = SqlStdOperatorTable.SUM.createCall(pos, mulArg);
     final SqlNode sumArg0 = SqlStdOperatorTable.SUM.createCall(pos, arg0);
-    final SqlNode mulSumAvg =
-            SqlStdOperatorTable.MULTIPLY.createCall(pos, sumArg0, avgArg1);
+    final SqlNode mulSumAvg = SqlStdOperatorTable.MULTIPLY.createCall(pos, sumArg0, avgArg1);
     final SqlNode sub = SqlStdOperatorTable.MINUS.createCall(pos, sumMulArg, mulSumAvg);
     final SqlNode count = SqlStdOperatorTable.COUNT.createCall(pos, operand0);
     final SqlNumericLiteral one = SqlLiteral.createExactNumeric("1", pos);
@@ -1334,33 +1176,27 @@ public final class MapDParser {
     SqlNodeList thenList1 = new SqlNodeList(pos);
     whenList1.add(countEqOne);
     thenList1.add(nul);
-    final SqlNode int_denominator = SqlStdOperatorTable.CASE.createCall(
-            null, pos, null, whenList1, thenList1, countMinusOne);
-    final SqlNode denominator = SqlStdOperatorTable.CAST.createCall(pos,
-            int_denominator,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
-    final SqlNode covarSamp =
-            SqlStdOperatorTable.DIVIDE.createCall(pos, sub, denominator);
-    return SqlStdOperatorTable.CAST.createCall(pos,
-            covarSamp,
-            SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(
-                    flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    final SqlNode int_denominator = SqlStdOperatorTable.CASE.createCall(null, pos, null, whenList1, thenList1,
+        countMinusOne);
+    final SqlNode denominator = SqlStdOperatorTable.CAST.createCall(pos, int_denominator,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
+    final SqlNode covarSamp = SqlStdOperatorTable.DIVIDE.createCall(pos, sub, denominator);
+    return SqlStdOperatorTable.CAST.createCall(pos, covarSamp,
+        SqlTypeUtil.convertTypeToSpec(typeFactory.createSqlType(flt ? SqlTypeName.FLOAT : SqlTypeName.DOUBLE)));
   }
 
-  private SqlNode expandCorrelation(
-          final SqlBasicCall proj_call, RelDataTypeFactory typeFactory) {
+  private SqlNode expandCorrelation(final SqlBasicCall proj_call, RelDataTypeFactory typeFactory) {
     // Expand correlation coefficient
     if (proj_call.operandCount() != 2) {
       return null;
     }
     boolean flt;
     if (proj_call.getOperator().isName("CORR", false)
-            || proj_call.getOperator().getName().equalsIgnoreCase("CORRELATION")) {
+        || proj_call.getOperator().getName().equalsIgnoreCase("CORRELATION")) {
       // expand correlation coefficient
       flt = false;
     } else if (proj_call.getOperator().getName().equalsIgnoreCase("CORR_FLOAT")
-            || proj_call.getOperator().getName().equalsIgnoreCase("CORRELATION_FLOAT")) {
+        || proj_call.getOperator().getName().equalsIgnoreCase("CORRELATION_FLOAT")) {
       // expand correlation coefficient
       flt = true;
     } else {
@@ -1372,31 +1208,25 @@ public final class MapDParser {
     final SqlNode operand0 = proj_call.operand(0);
     final SqlNode operand1 = proj_call.operand(1);
     final SqlParserPos pos = proj_call.getParserPosition();
-    SqlNode covariance =
-            expandCovariance(pos, operand0, operand1, true, flt, typeFactory);
+    SqlNode covariance = expandCovariance(pos, operand0, operand1, true, flt, typeFactory);
     SqlNode stddev0 = expandVariance(pos, operand0, true, true, flt, typeFactory);
     SqlNode stddev1 = expandVariance(pos, operand1, true, true, flt, typeFactory);
-    final SqlNode mulStddev =
-            SqlStdOperatorTable.MULTIPLY.createCall(pos, stddev0, stddev1);
+    final SqlNode mulStddev = SqlStdOperatorTable.MULTIPLY.createCall(pos, stddev0, stddev1);
     final SqlNumericLiteral zero = SqlLiteral.createExactNumeric("0.0", pos);
-    final SqlNode mulStddevEqZero =
-            SqlStdOperatorTable.EQUALS.createCall(pos, mulStddev, zero);
+    final SqlNode mulStddevEqZero = SqlStdOperatorTable.EQUALS.createCall(pos, mulStddev, zero);
     final SqlLiteral nul = SqlLiteral.createNull(pos);
     SqlNodeList whenList1 = new SqlNodeList(pos);
     SqlNodeList thenList1 = new SqlNodeList(pos);
     whenList1.add(mulStddevEqZero);
     thenList1.add(nul);
-    final SqlNode denominator = SqlStdOperatorTable.CASE.createCall(
-            null, pos, null, whenList1, thenList1, mulStddev);
-    final SqlNode expanded_proj_call =
-            SqlStdOperatorTable.DIVIDE.createCall(pos, covariance, denominator);
+    final SqlNode denominator = SqlStdOperatorTable.CASE.createCall(null, pos, null, whenList1, thenList1, mulStddev);
+    final SqlNode expanded_proj_call = SqlStdOperatorTable.DIVIDE.createCall(pos, covariance, denominator);
     MAPDLOGGER.debug("Expanded select_list SqlCall: " + proj_call.toString());
     MAPDLOGGER.debug("to : " + expanded_proj_call.toString());
     return expanded_proj_call;
   }
 
-  public SqlIdentifierCapturer captureIdentifiers(String sql, boolean legacy_syntax)
-          throws SqlParseException {
+  public SqlIdentifierCapturer captureIdentifiers(String sql, boolean legacy_syntax) throws SqlParseException {
     try {
       Planner planner = getPlanner();
       SqlNode node = parseSql(sql, legacy_syntax, planner);
@@ -1424,8 +1254,7 @@ public final class MapDParser {
 
   public void updateMetaData(String schema, String table) {
     MAPDLOGGER.debug("schema :" + schema + " table :" + table);
-    MapDSchema mapd =
-            new MapDSchema(dataDir, this, mapdPort, null, sock_transport_properties);
+    MapDSchema mapd = new MapDSchema(dataDir, this, mapdPort, null, sock_transport_properties);
     mapd.updateMetaData(schema, table);
   }
 

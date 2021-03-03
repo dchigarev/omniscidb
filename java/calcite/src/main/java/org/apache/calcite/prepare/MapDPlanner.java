@@ -65,15 +65,13 @@ import java.util.List;
 import java.util.Properties;
 
 /**
- * Customised version of the PlannerImpl for MapD.
- * Used to be a copy of PlannerImpl,
- * refactored now to use inheritance to minimize maintenance efforts.
- * Implementation of {@link org.apache.calcite.tools.Planner}.
+ * Customised version of the PlannerImpl for MapD. Used to be a copy of
+ * PlannerImpl, refactored now to use inheritance to minimize maintenance
+ * efforts. Implementation of {@link org.apache.calcite.tools.Planner}.
  */
 public class MapDPlanner extends PlannerImpl {
   FrameworkConfig config;
-  private List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo =
-          new ArrayList<>();
+  private List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo = new ArrayList<>();
   private Restriction restriction = null;
   final static Logger MAPDLOGGER = LoggerFactory.getLogger(MapDPlanner.class);
 
@@ -111,14 +109,12 @@ public class MapDPlanner extends PlannerImpl {
     } else {
       Properties properties = new Properties();
       properties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(),
-              String.valueOf(config.getParserConfig().caseSensitive()));
+          String.valueOf(config.getParserConfig().caseSensitive()));
       connectionConfig = new CalciteConnectionConfigImpl(properties);
     }
 
     return new CalciteCatalogReader(CalciteSchema.from(rootSchema),
-            CalciteSchema.from(config.getDefaultSchema()).path(null),
-            getTypeFactory(),
-            connectionConfig);
+        CalciteSchema.from(config.getDefaultSchema()).path(null), getTypeFactory(), connectionConfig);
   }
 
   public void advanceToValidate() {
@@ -139,7 +135,7 @@ public class MapDPlanner extends PlannerImpl {
       readyMethod.invoke(this);
     } catch (InvocationTargetException e) {
       if (e.getCause() instanceof RuntimeException) {
-        throw(RuntimeException) e.getCause();
+        throw (RuntimeException) e.getCause();
       } else {
         throw new RuntimeException(e.getCause());
       }
@@ -148,23 +144,18 @@ public class MapDPlanner extends PlannerImpl {
     }
   }
 
-  public CompletionResult getCompletionHints(
-          final String sql, final int cursor, final List<String> visibleTables) {
+  public CompletionResult getCompletionHints(final String sql, final int cursor, final List<String> visibleTables) {
     ready();
 
     SqlValidator.Config validatorConfig = SqlValidator.Config.DEFAULT;
     validatorConfig = validatorConfig.withSqlConformance(SqlConformanceEnum.LENIENT);
 
-    MapDSqlAdvisorValidator advisor_validator = new MapDSqlAdvisorValidator(visibleTables,
-            config.getOperatorTable(),
-            createCatalogReader(),
-            getTypeFactory(),
-            validatorConfig);
+    MapDSqlAdvisorValidator advisor_validator = new MapDSqlAdvisorValidator(visibleTables, config.getOperatorTable(),
+        createCatalogReader(), getTypeFactory(), validatorConfig);
     SqlAdvisor advisor = new MapDSqlAdvisor(advisor_validator, config.getParserConfig());
     String[] replaced = new String[1];
     int adjusted_cursor = cursor < 0 ? sql.length() : cursor;
-    java.util.List<SqlMoniker> hints =
-            advisor.getCompletionHints(sql, adjusted_cursor, replaced);
+    java.util.List<SqlMoniker> hints = advisor.getCompletionHints(sql, adjusted_cursor, replaced);
     return new CompletionResult(hints, replaced[0]);
   }
 
@@ -182,11 +173,9 @@ public class MapDPlanner extends PlannerImpl {
   private RelRoot applyInjectFilterRule(RelRoot root, Restriction restriction) {
     // TODO consider doing these rules in one preplan pass
 
-    final InjectFilterRule injectFilterRule =
-            InjectFilterRule.Config.DEFAULT.toRule(restriction);
+    final InjectFilterRule injectFilterRule = InjectFilterRule.Config.DEFAULT.toRule(restriction);
 
-    final HepProgram program =
-            HepProgram.builder().addRuleInstance(injectFilterRule).build();
+    final HepProgram program = HepProgram.builder().addRuleInstance(injectFilterRule).build();
     HepPlanner prePlanner = new HepPlanner(program);
     prePlanner.setRoot(root.rel);
     final RelNode rootRelNode = prePlanner.findBestExp();
@@ -197,12 +186,9 @@ public class MapDPlanner extends PlannerImpl {
     if (filterPushDownInfo.isEmpty()) {
       return root;
     }
-    final DynamicFilterJoinRule dynamicFilterJoinRule = new DynamicFilterJoinRule(true,
-            RelFactories.LOGICAL_BUILDER,
-            FilterJoinRule.TRUE_PREDICATE,
-            filterPushDownInfo);
-    final HepProgram program =
-            HepProgram.builder().addRuleInstance(dynamicFilterJoinRule).build();
+    final DynamicFilterJoinRule dynamicFilterJoinRule = new DynamicFilterJoinRule(true, RelFactories.LOGICAL_BUILDER,
+        FilterJoinRule.TRUE_PREDICATE, filterPushDownInfo);
+    final HepProgram program = HepProgram.builder().addRuleInstance(dynamicFilterJoinRule).build();
     HepPlanner prePlanner = new HepPlanner(program);
     prePlanner.setRoot(root.rel);
     final RelNode rootRelNode = prePlanner.findBestExp();
@@ -211,13 +197,10 @@ public class MapDPlanner extends PlannerImpl {
   }
 
   private RelRoot applyQueryOptimizationRules(RelRoot root) {
-    QueryOptimizationRules outerJoinOptRule =
-            new OuterJoinOptViaNullRejectionRule(RelFactories.LOGICAL_BUILDER);
+    QueryOptimizationRules outerJoinOptRule = new OuterJoinOptViaNullRejectionRule(RelFactories.LOGICAL_BUILDER);
 
-    HepProgram opt_program =
-            HepProgram.builder().addRuleInstance(outerJoinOptRule).build();
-    HepPlanner prePlanner = new HepPlanner(
-            opt_program, null, true, Functions.ignore2(), RelOptCostImpl.FACTORY);
+    HepProgram opt_program = HepProgram.builder().addRuleInstance(outerJoinOptRule).build();
+    HepPlanner prePlanner = new HepPlanner(opt_program, null, true, Functions.ignore2(), RelOptCostImpl.FACTORY);
     prePlanner.setRoot(root.rel);
     final RelNode rootRelNode = prePlanner.findBestExp();
     return root.withRel(rootRelNode);
@@ -231,27 +214,20 @@ public class MapDPlanner extends PlannerImpl {
     MapDRelJsonReader reader = new MapDRelJsonReader(cluster, catalogReader, schema);
 
     RelRoot relR = RelRoot.of(reader.read(query), SqlKind.SELECT);
+
+    if (restriction != null) {
+      relR = applyInjectFilterRule(relR, restriction);
+    }
+
     applyQueryOptimizationRules(relR);
     applyFilterPushdown(relR);
 
-    HepProgramBuilder hepBuilder = new HepProgramBuilder();
-    hepBuilder.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE_INCLUDE_OUTER);
-    hepBuilder.addRuleInstance(CoreRules.FILTER_MERGE);
-    hepBuilder.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
-    hepBuilder.addRuleInstance(CoreRules.PROJECT_MERGE);
-    hepBuilder.addRuleInstance(ProjectProjectRemoveRule.INSTANCE);
-
-    HepPlanner hepPlanner = new HepPlanner(hepBuilder.build());
-
     final RelNode root = relR.project();
-    hepPlanner.setRoot(root);
-    final RelNode newRel = hepPlanner.findBestExp();
 
-    return RelRoot.of(newRel, relR.kind);
+    return RelRoot.of(root, relR.kind);
   }
 
-  public void setFilterPushDownInfo(
-          final List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo) {
+  public void setFilterPushDownInfo(final List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo) {
     this.filterPushDownInfo = filterPushDownInfo;
   }
 
