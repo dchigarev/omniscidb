@@ -299,6 +299,10 @@ extern "C" ALWAYS_INLINE uint64_t agg_count(uint64_t* agg, const int64_t) {
   return (*agg)++;
 }
 
+extern "C" ALWAYS_INLINE uint64_t agg_count_cpu_shared(uint64_t* agg, const int64_t) {
+  return __atomic_fetch_add(agg, (uint64_t)1, __ATOMIC_ACQ_REL);
+}
+
 extern "C" ALWAYS_INLINE void agg_count_distinct_bitmap(int64_t* agg,
                                                         const int64_t val,
                                                         const int64_t min_val) {
