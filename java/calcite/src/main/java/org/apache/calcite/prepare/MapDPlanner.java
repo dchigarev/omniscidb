@@ -206,6 +206,34 @@ public class MapDPlanner extends PlannerImpl {
     return root.withRel(rootRelNode);
   }
 
+  private RelRoot applyModinOptimizationsStep1(RelRoot root) {
+    HepProgramBuilder programBuilder = new HepProgramBuilder();
+    programBuilder.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE_INCLUDE_OUTER);
+    programBuilder.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
+    programBuilder.addRuleInstance(ProjectProjectRemoveRule.INSTANCE);
+    programBuilder.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE);
+    HepPlanner hepPlanner = new HepPlanner(programBuilder.build());
+    hepPlanner.setRoot(root.rel);
+    return root.withRel(hepPlanner.findBestExp());
+  }
+
+  private RelRoot applyModinOptimizationsStep2(RelRoot root) {
+    HepProgramBuilder programBuilder = new HepProgramBuilder();
+    programBuilder.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
+    programBuilder.addRuleInstance(CoreRules.PROJECT_REMOVE);
+    HepPlanner hepPlanner = new HepPlanner(programBuilder.build());
+    hepPlanner.setRoot(root.rel);
+    return root.withRel(hepPlanner.findBestExp());
+  }
+
+  private RelRoot applyModinOptimizationsStep3(RelRoot root) {
+    HepProgramBuilder programBuilder = new HepProgramBuilder();
+    programBuilder.addRuleInstance(CoreRules.PROJECT_MERGE);
+    HepPlanner hepPlanner = new HepPlanner(programBuilder.build());
+    hepPlanner.setRoot(root.rel);
+    return root.withRel(hepPlanner.findBestExp());
+  }
+
   public RelRoot optimizeRaQuery(String query, MapDSchema schema) throws IOException {
     ready();
     RexBuilder builder = new RexBuilder(getTypeFactory());
@@ -219,21 +247,12 @@ public class MapDPlanner extends PlannerImpl {
       relR = applyInjectFilterRule(relR, restriction);
     }
 
-    applyQueryOptimizationRules(relR);
-    applyFilterPushdown(relR);
-
-    HepProgramBuilder programBuilder = new HepProgramBuilder();
-    programBuilder.addRuleInstance(CoreRules.JOIN_PROJECT_BOTH_TRANSPOSE_INCLUDE_OUTER);
-    programBuilder.addRuleInstance(CoreRules.FILTER_PROJECT_TRANSPOSE);
-    programBuilder.addRuleInstance(CoreRules.PROJECT_REMOVE);
-    programBuilder.addRuleInstance(CoreRules.FILTER_REDUCE_EXPRESSIONS);
-    programBuilder.addRuleInstance(ProjectProjectRemoveRule.INSTANCE);
-    programBuilder.addRuleInstance(CoreRules.PROJECT_FILTER_TRANSPOSE);
-
-    HepPlanner hepPlanner = new HepPlanner(programBuilder.build());
-    final RelNode root = relR.project();
-    hepPlanner.setRoot(root);
-    return RelRoot.of(hepPlanner.findBestExp(), relR.kind);
+    relR = applyQueryOptimizationRules(relR);
+    relR = applyFilterPushdown(relR);
+    relR = applyModinOptimizationsStep1(relR);
+    relR = applyModinOptimizationsStep3(relR);
+    relR = applyModinOptimizationsStep2(relR);
+    return RelRoot.of(relR.project(), relR.kind);
   }
 
   public void setFilterPushDownInfo(final List<MapDParserOptions.FilterPushDownInfo> filterPushDownInfo) {
